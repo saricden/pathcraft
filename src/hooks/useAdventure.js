@@ -1,28 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   NARRATIVE_MAX_TOKENS,
-  OPTIONS_MAX_TOKENS,
+  SINGLE_OPTION_MAX_TOKENS,
   FALLBACK_NARRATIVE,
   buildOpeningNarrativeMessages,
   buildNarrativeMessages,
-  buildOptionsMessages,
+  buildSingleOptionMessages,
   cleanNarrative,
-  extractOptions,
-  padOptions,
+  cleanOption,
+  fallbackOption,
 } from '../lib/storyEngine';
+import { saveGame } from '../lib/saves';
 
 const FRIENDLY_GENERATION_ERROR =
   'Something interrupted the story on this device. Tap Try Again to continue.';
 
-export function useAdventure(workerRef, backend, reloadOnCpu) {
-  const [blocks, setBlocks] = useState([]);
-  const [pending, setPending] = useState({ phase: 'thinking', text: '', error: null });
-  const nextIdRef = useRef(0);
+export function useAdventure(workerRef, backend, reloadOnCpu, saveId, initialBlocks) {
+  const isResuming = Boolean(initialBlocks && initialBlocks.length > 0);
+  const [blocks, setBlocks] = useState(initialBlocks ?? []);
+  const [pending, setPending] = useState(isResuming ? null : { phase: 'thinking', text: '', error: null });
+  const nextIdRef = useRef(isResuming ? initialBlocks[initialBlocks.length - 1].id + 1 : 0);
   const lastTurnRef = useRef(null); // { blocks, isOpening }
   const openingStartedRef = useRef(false);
   const fallbackAttemptedRef = useRef(false);
   const narrativeRetriedRef = useRef(false);
-  const optionsRetriedRef = useRef(false);
 
   function showError() {
     setPending((prev) => (prev ? { ...prev, phase: 'error', error: FRIENDLY_GENERATION_ERROR } : prev));
@@ -37,35 +38,49 @@ export function useAdventure(workerRef, backend, reloadOnCpu) {
     }
   }
 
-  function runOptionsStage(updatedBlocks, sentence) {
-    setPending({ phase: 'choosing', text: sentence, error: null });
+  function finishTurn(updatedBlocks, sentence, options) {
+    const block = { id: nextIdRef.current++, narrative: sentence, options, chosenIndex: null };
+    const next = [...updatedBlocks, block];
+    setBlocks(next);
+    saveGame(saveId, next);
+    setPending(null);
+  }
+
+  function collectOption(updatedBlocks, sentence, collected, retried = false) {
+    setPending((prev) => (prev ? { ...prev, optionsFound: collected.length } : prev));
 
     const worker = workerRef.current;
     worker.onmessage = (event) => {
       const data = event.data;
       if (data.status === 'complete') {
-        const extracted = extractOptions(data.text);
-        // Content-level retry: a completely empty result is worth one more
-        // attempt before settling for generic fallback options.
-        if (extracted.length === 0 && !optionsRetriedRef.current) {
-          optionsRetriedRef.current = true;
-          runOptionsStage(updatedBlocks, sentence);
+        const option = cleanOption(data.text);
+        // Content-level retry: an empty/truncated-looking option is worth
+        // one more attempt for this slot before settling for a fallback.
+        if (!option && !retried) {
+          collectOption(updatedBlocks, sentence, collected, true);
           return;
         }
-        const options = padOptions(extracted);
-        const block = { id: nextIdRef.current++, narrative: sentence, options, chosenIndex: null };
-        setBlocks((prev) => [...prev, block]);
-        setPending(null);
+        const next = [...collected, option || fallbackOption(collected.length)];
+        if (next.length < 3) {
+          collectOption(updatedBlocks, sentence, next);
+        } else {
+          finishTurn(updatedBlocks, sentence, next);
+        }
       } else if (data.status === 'error') {
-        withGpuFallback(() => runOptionsStage(updatedBlocks, sentence));
+        withGpuFallback(() => collectOption(updatedBlocks, sentence, collected, retried));
       }
     };
 
     worker.postMessage({
       type: 'generate',
-      messages: buildOptionsMessages(updatedBlocks, sentence),
-      maxNewTokens: OPTIONS_MAX_TOKENS,
+      messages: buildSingleOptionMessages(updatedBlocks, sentence, collected),
+      maxNewTokens: SINGLE_OPTION_MAX_TOKENS,
     });
+  }
+
+  function runOptionsStage(updatedBlocks, sentence) {
+    setPending({ phase: 'choosing', text: sentence, error: null, optionsFound: 0 });
+    collectOption(updatedBlocks, sentence, []);
   }
 
   function runNarrativeStage(updatedBlocks, isOpening) {
@@ -108,7 +123,6 @@ export function useAdventure(workerRef, backend, reloadOnCpu) {
   function resetRetryState() {
     fallbackAttemptedRef.current = false;
     narrativeRetriedRef.current = false;
-    optionsRetriedRef.current = false;
   }
 
   function beginOpening() {
@@ -138,6 +152,7 @@ export function useAdventure(workerRef, backend, reloadOnCpu) {
   useEffect(() => {
     if (openingStartedRef.current) return;
     openingStartedRef.current = true;
+    if (isResuming) return;
     beginOpening();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

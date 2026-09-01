@@ -18,30 +18,29 @@ commentary.
 Example reply:
 You reach the old mill and find its doors sealed with fresh chains.`;
 
-export const OPTIONS_SYSTEM_PROMPT = `You are the game master of a dark-fantasy adventure called Pathcraft.
-Given the current scene, list exactly 3 short possible next actions for the
-player. Each action should be a meaningful, "macro" choice — travel
-somewhere, seek out someone, pursue a lead, make a decision — not a small
-physical gesture. Reply with ONLY 3 short lines, one action per line, and
-nothing else — no numbering, no labels, no extra commentary.
+export const SINGLE_OPTION_SYSTEM_PROMPT = `You are the game master of a dark-fantasy adventure called Pathcraft.
+Given the current scene, suggest ONE short possible next action for the
+player — a meaningful "macro" choice such as traveling somewhere, seeking
+someone out, pursuing a lead, or making a decision. Reply with ONLY that
+one action, 3-6 words, nothing else — no numbering, no labels, no ending
+punctuation, no extra commentary.
 
 Example reply:
-Travel to the mountain pass
-Question the merchant
-Return to the village at nightfall
-
-Each action must be distinct from the others and from actions used earlier.`;
+Travel to the mountain pass`;
 
 export const NARRATIVE_MAX_TOKENS = 60;
-export const OPTIONS_MAX_TOKENS = 50;
+export const SINGLE_OPTION_MAX_TOKENS = 20;
 
 export const FALLBACK_NARRATIVE = 'The road ahead is uncertain, but you press onward.';
 
 const MAX_CONTEXT_BLOCKS = 3;
 const MAX_NARRATIVE_SENTENCES = 2;
-const LIST_REQUEST = 'List exactly 3 short possible next actions for this scene.';
 
 const FALLBACK_OPTIONS = ['Continue onward', 'Seek out answers', 'Return to safety'];
+
+export function fallbackOption(index) {
+  return FALLBACK_OPTIONS[index] ?? FALLBACK_OPTIONS[FALLBACK_OPTIONS.length - 1];
+}
 
 // Each call's history is shaped to match exactly what that call is being
 // asked for right now — mixing formats (e.g. showing labeled multi-line
@@ -60,20 +59,6 @@ function buildNarrativeHistory(blocks) {
   return messages;
 }
 
-function buildOptionsHistory(blocks) {
-  const recent = blocks.slice(-MAX_CONTEXT_BLOCKS);
-  const messages = [];
-  for (const block of recent) {
-    messages.push({ role: 'assistant', content: block.narrative });
-    messages.push({ role: 'user', content: LIST_REQUEST });
-    messages.push({ role: 'assistant', content: block.options.join('\n') });
-    if (block.chosenIndex != null) {
-      messages.push({ role: 'user', content: `I chose: "${block.options[block.chosenIndex]}"` });
-    }
-  }
-  return messages;
-}
-
 export function buildOpeningNarrativeMessages() {
   return [{ role: 'system', content: OPENING_NARRATIVE_SYSTEM_PROMPT }];
 }
@@ -82,12 +67,34 @@ export function buildNarrativeMessages(blocks) {
   return [{ role: 'system', content: NARRATIVE_SYSTEM_PROMPT }, ...buildNarrativeHistory(blocks)];
 }
 
-export function buildOptionsMessages(blocks, sentence) {
+// One option per call, each with its own small token budget — this is what
+// actually guarantees no single option can balloon and starve the others of
+// the shared budget (which is what kept happening when all 3 were asked for
+// in one generation, even with explicit length instructions in the prompt).
+// History is deliberately flattened into plain descriptive text rather than
+// replayed as multi-turn chat — there's no "list of 3" pattern to stay
+// consistent with anymore, so a single flat instruction is simpler and more
+// reliable for a small model than reconstructing a chat-shaped few-shot set.
+export function buildSingleOptionMessages(blocks, sentence, existingOptions) {
+  const recentChoices = blocks
+    .slice(-MAX_CONTEXT_BLOCKS)
+    .filter((block) => block.chosenIndex != null)
+    .map((block) => block.options[block.chosenIndex]);
+
+  const lines = [`Current scene: ${sentence}`];
+  if (recentChoices.length > 0) {
+    lines.push(`Actions the player has already taken: ${recentChoices.join('; ')}.`);
+  }
+  if (existingOptions.length > 0) {
+    lines.push(
+      `Actions already suggested for this scene — do not repeat or closely resemble these: ${existingOptions.join('; ')}.`,
+    );
+  }
+  lines.push('Suggest one short next action.');
+
   return [
-    { role: 'system', content: OPTIONS_SYSTEM_PROMPT },
-    ...buildOptionsHistory(blocks),
-    { role: 'assistant', content: sentence },
-    { role: 'user', content: LIST_REQUEST },
+    { role: 'system', content: SINGLE_OPTION_SYSTEM_PROMPT },
+    { role: 'user', content: lines.join('\n') },
   ];
 }
 
@@ -118,16 +125,35 @@ export function cleanNarrative(raw) {
 
 const LEADING_MARKER_RE = /^\s*(?:OPTION\s*\d+\s*:|[-*•]|\d+[.):])\s*/i;
 
-export function extractOptions(raw) {
-  return raw
-    .split('\n')
-    .map((line) => line.replace(LEADING_MARKER_RE, '').trim())
-    .filter(Boolean)
-    .slice(0, 3);
+// Options are short phrases and legitimately have no terminal punctuation
+// ("Return to safety"), so completeness can't be judged by "ends with a
+// period" the way narrative sentences can. Instead, reject lines whose last
+// word is one that would essentially never end a real action — a strong
+// signal generation was cut off mid-thought rather than a real short line.
+const INCOMPLETE_TRAILING_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'to', 'of', 'in', 'on', 'at', 'for',
+  'with', 'from', 'into', 'onto', 'if', 'as', 'so', 'that', 'who', 'which',
+  'is', 'was', 'are', 'be', 'been', 'being', 'has', 'have', 'had',
+  'seems', 'seem', 'appears', 'appear', 'feels', 'feel', 'looks', 'look',
+]);
+
+function looksTruncated(line) {
+  if (/[,;:]$/.test(line)) return true;
+  const words = line.split(/\s+/);
+  const lastWord = words[words.length - 1]?.toLowerCase().replace(/[^a-z']/g, '');
+  return INCOMPLETE_TRAILING_WORDS.has(lastWord);
 }
 
-export function padOptions(options) {
-  const padded = [...options];
-  while (padded.length < 3) padded.push(FALLBACK_OPTIONS[padded.length]);
-  return padded;
+// A single option's raw reply may still contain stray extra lines despite
+// being asked for one — take only the first line, and reject it if it looks
+// truncated or is empty (the caller retries once, then falls back).
+export function cleanOption(raw) {
+  const line = raw
+    .trim()
+    .split('\n')[0]
+    .replace(LEADING_MARKER_RE, '')
+    .replace(/[.!?]+$/, '')
+    .trim();
+  if (!line || looksTruncated(line)) return '';
+  return line;
 }

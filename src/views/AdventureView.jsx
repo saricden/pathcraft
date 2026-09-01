@@ -70,7 +70,7 @@ function PendingBlock({ pending, onRetry }) {
             <span />
             <span />
           </span>
-          Choosing paths…
+          Choosing paths… ({pending.optionsFound ?? 0}/3)
         </div>
       </div>
     );
@@ -101,8 +101,8 @@ function PendingBlock({ pending, onRetry }) {
   );
 }
 
-function AdventureView({ worker, backend, reloadOnCpu }) {
-  const { blocks, pending, choose, retry } = useAdventure(worker, backend, reloadOnCpu);
+function AdventureView({ worker, backend, reloadOnCpu, saveId, initialBlocks }) {
+  const { blocks, pending, choose, retry } = useAdventure(worker, backend, reloadOnCpu, saveId, initialBlocks);
   const logRef = useRef(null);
   const bottomRef = useRef(null);
 

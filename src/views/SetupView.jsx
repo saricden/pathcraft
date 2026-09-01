@@ -13,7 +13,7 @@ const BACKEND_COPY = {
   cpu: 'CPU mode — responses may be a little slower',
 };
 
-function SetupView({ status, backend, progress, statusText, install, onBeginAdventure }) {
+function SetupView({ status, backend, progress, statusText, install, onNewAdventure, onLoadAdventure }) {
   const percent = Math.round(progress * 100);
 
   return (
@@ -86,14 +86,22 @@ function SetupView({ status, backend, progress, statusText, install, onBeginAdve
             type="button"
             className={`btn ${status === 'ready' ? 'btn--primary' : 'btn--ghost'}`}
             disabled={status !== 'ready'}
-            onClick={onBeginAdventure}
+            onClick={onNewAdventure}
           >
-            Begin Adventure
+            Start New Adventure
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={status !== 'ready'}
+            onClick={onLoadAdventure}
+          >
+            Load Adventure
           </button>
         </div>
 
         {status !== 'ready' && (
-          <p className="card__hint">Begin Adventure unlocks once the model finishes preparing.</p>
+          <p className="card__hint">Adventure options unlock once the model finishes preparing.</p>
         )}
       </div>
     </section>
