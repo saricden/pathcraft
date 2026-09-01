@@ -21,8 +21,14 @@
 
   --track: rgba(255, 255, 255, 0.08);
 
+  --success: #47bfff;
+  --success-soft: rgba(71, 191, 255, 0.18);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.16);
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --serif: ui-serif, Iowan Old Style, Palatino, 'Palatino Linotype', Georgia, serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   font: 16px/1.5 var(--sans);
   color-scheme: dark;

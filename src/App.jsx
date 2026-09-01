@@ -1,51 +1,35 @@
+import { useCallback, useState } from 'react';
+import SetupView from './views/SetupView';
+import AdventureView from './views/AdventureView';
 import './App.css';
 
+const PORTAL_DURATION_MS = 650;
+const PORTAL_SWAP_MS = 380;
+
 function App() {
+  const [view, setView] = useState('setup');
+  const [portalActive, setPortalActive] = useState(false);
+
+  const handleBeginAdventure = useCallback(() => {
+    setPortalActive(true);
+    setTimeout(() => setView('adventure'), PORTAL_SWAP_MS);
+    setTimeout(() => setPortalActive(false), PORTAL_DURATION_MS);
+  }, []);
+
   return (
-    <section className="setup">
-      <div className="brand">
-        <svg
-          className="brand__glyph"
-          viewBox="0 0 24 24"
-          fill="none"
-          role="presentation"
-          aria-hidden="true"
-        >
-          <path
-            d="M12 2 14.2 9.8 22 12 14.2 14.2 12 22 9.8 14.2 2 12 9.8 9.8 12 2Z"
-            fill="currentColor"
-          />
-        </svg>
-        <h1 className="brand__title">Pathcraft</h1>
-        <p className="brand__tagline">An AI-crafted text adventure, built as you play</p>
-      </div>
-
-      <div className="card">
-        <div className="card__heading">
-          <h2>Prepare your journey</h2>
-          <p>
-            Pathcraft tells its story using a small AI model that runs entirely in
-            your browser. Install it once, offline play from then on.
-          </p>
+    <div className="app-shell">
+      {view === 'setup' && (
+        <div className={`app-shell__stage ${portalActive ? 'app-shell__stage--leaving' : ''}`}>
+          <SetupView onBeginAdventure={handleBeginAdventure} />
         </div>
-
-        <div className="model-status">
-          <span className="model-status__dot" />
-          <span>Model not installed</span>
+      )}
+      {view === 'adventure' && (
+        <div className="app-shell__stage app-shell__stage--entering">
+          <AdventureView />
         </div>
-
-        <div className="card__actions">
-          <button type="button" className="btn btn--primary">
-            Install Model
-          </button>
-          <button type="button" className="btn btn--ghost" disabled>
-            Begin Adventure
-          </button>
-        </div>
-
-        <p className="card__hint">Begin Adventure unlocks once the model finishes installing.</p>
-      </div>
-    </section>
+      )}
+      <div className={`portal-veil ${portalActive ? 'portal-veil--active' : ''}`} aria-hidden="true" />
+    </div>
   );
 }
 
