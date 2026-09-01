@@ -1,0 +1,70 @@
+:root {
+  --bg: #0b0a13;
+  --bg-glow: radial-gradient(
+      60% 50% at 50% 0%,
+      rgba(170, 59, 255, 0.22) 0%,
+      rgba(170, 59, 255, 0) 60%
+    ),
+    radial-gradient(45% 40% at 85% 90%, rgba(71, 191, 255, 0.1) 0%, rgba(71, 191, 255, 0) 60%);
+
+  --text: #cbc7d9;
+  --text-h: #f5f3fb;
+  --text-dim: #8b869c;
+
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(255, 255, 255, 0.09);
+
+  --accent: #aa3bff;
+  --accent-2: #7e14ff;
+  --accent-soft: rgba(170, 59, 255, 0.14);
+  --accent-border: rgba(170, 59, 255, 0.45);
+
+  --track: rgba(255, 255, 255, 0.08);
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --serif: ui-serif, Iowan Old Style, Palatino, 'Palatino Linotype', Georgia, serif;
+
+  font: 16px/1.5 var(--sans);
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg-glow), var(--bg);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
