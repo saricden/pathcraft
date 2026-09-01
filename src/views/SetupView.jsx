@@ -1,12 +1,11 @@
-import { useModelInstall } from '../hooks/useModelInstall';
 import './SetupView.css';
 
 const STATUS_COPY = {
   checking: 'Checking your device…',
-  idle: 'Model not installed',
-  installing: 'Installing…',
-  ready: 'Model installed',
-  error: 'Install failed',
+  idle: 'Model not ready',
+  installing: 'Preparing…',
+  ready: 'Model prepared',
+  error: 'Preparation failed',
 };
 
 const BACKEND_COPY = {
@@ -14,8 +13,7 @@ const BACKEND_COPY = {
   cpu: 'CPU mode — responses may be a little slower',
 };
 
-function SetupView({ onBeginAdventure }) {
-  const { status, backend, progress, statusText, install } = useModelInstall();
+function SetupView({ status, backend, progress, statusText, install, onBeginAdventure }) {
   const percent = Math.round(progress * 100);
 
   return (
@@ -42,7 +40,7 @@ function SetupView({ onBeginAdventure }) {
           <h2>Prepare your journey</h2>
           <p>
             Pathcraft tells its story using a small AI model that runs entirely in
-            your browser. Install it once, offline play from then on.
+            your browser. Prepare it once, offline play from then on.
           </p>
         </div>
 
@@ -80,7 +78,7 @@ function SetupView({ onBeginAdventure }) {
             >
               {status === 'checking' && 'Checking…'}
               {status === 'idle' && 'Prepare Model'}
-              {status === 'installing' && 'Installing…'}
+              {status === 'installing' && 'Preparing…'}
               {status === 'error' && 'Try Again'}
             </button>
           )}
@@ -95,7 +93,7 @@ function SetupView({ onBeginAdventure }) {
         </div>
 
         {status !== 'ready' && (
-          <p className="card__hint">Begin Adventure unlocks once the model finishes installing.</p>
+          <p className="card__hint">Begin Adventure unlocks once the model finishes preparing.</p>
         )}
       </div>
     </section>

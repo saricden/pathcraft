@@ -7,10 +7,19 @@ function basename(path) {
 function backendConfig(backend) {
   return backend === 'gpu'
     ? { device: 'webgpu', dtype: 'q4f16' }
-    : { device: 'wasm', dtype: 'q8' };
+    : { device: 'wasm', dtype: 'q4f16' };
+}
+
+function isMobileDevice() {
+  if (navigator.userAgentData?.mobile != null) return navigator.userAgentData.mobile;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 async function detectBackend() {
+  // Mobile WebGPU is known to crash mid-inference on some devices (GPU
+  // "device lost" errors), even when an adapter is reported as available.
+  // CPU is slower but reliable, so skip WebGPU on mobile entirely.
+  if (isMobileDevice()) return 'cpu';
   if (!navigator.gpu) return 'cpu';
   try {
     const adapter = await navigator.gpu.requestAdapter();
@@ -62,7 +71,7 @@ export function useModelInstall() {
         runInstall('cpu');
         return;
       }
-      setStatusText(message || 'Something went wrong installing the model.');
+      setStatusText(message || 'Something went wrong preparing the model.');
       setStatus('error');
     };
 
@@ -103,5 +112,33 @@ export function useModelInstall() {
     runInstall(backend);
   }
 
-  return { status, backend, progress, statusText, install, worker: workerRef };
+  // Mid-game safety net: if generation itself fails on GPU (e.g. a WebGPU
+  // "device lost" crash), reload the pipeline on CPU without disturbing the
+  // setup screen's status/progress state (the setup screen is long gone by
+  // the time this is called).
+  function reloadOnCpu() {
+    return new Promise((resolve, reject) => {
+      workerRef.current?.terminate();
+      const worker = new Worker(new URL('../workers/llmWorker.js', import.meta.url), {
+        type: 'module',
+      });
+      workerRef.current = worker;
+
+      worker.onmessage = (event) => {
+        const data = event.data;
+        if (data.status === 'ready') {
+          setBackend('cpu');
+          resolve();
+        } else if (data.status === 'error') {
+          reject(new Error(data.error));
+        }
+      };
+      worker.onerror = (event) => reject(new Error(event.message));
+
+      const { device, dtype } = backendConfig('cpu');
+      worker.postMessage({ type: 'load', device, dtype });
+    });
+  }
+
+  return { status, backend, progress, statusText, install, worker: workerRef, reloadOnCpu };
 }
