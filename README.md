@@ -29,3 +29,7 @@ cd pathcraft # Open the new directory
 npm install # Install npm dependencies
 npm run dev # Boot up the local dev server
 ```
+
+## Notes on AI usage
+
+I want to note for the sake of transparency that much of this project was coded using Claude Code Sonnet 5. I wrote about my shifting views on agentic coding [here](https://saricden.com/from-skepticism-to-cautious-optimism-my-foray-into-coding-agents/).
