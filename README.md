@@ -1,16 +1,31 @@
-# React + Vite
+# ![Pathcraft](https://raw.githubusercontent.com/saricden/pathcraft/refs/heads/main/public/og.jpg "Pathcraft")
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Pathcraft is a tech demo I built to experiment with running local small language models on a web worker. It is a generative text-based adventure game, wherein a narrative passage describing a scene in a story is written by the local LLM and 3 action options are presented to the player, who can then choose the path to take.
 
-Currently, two official plugins are available:
+[***Live demo***](https://pathcraft.saricden.com/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/32dfaf5d-653e-4c8c-bb18-55e8f2ef1d73/deploy-status)](https://app.netlify.com/projects/sdn-pathcraft/deploys)
 
-## React Compiler
+**Performance note:** on lower spec consumer devices this app will run very slowly, or may even not run at all. This is because all of the AI compute is happening on-device which requires a lot of RAM and local compute.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Game features
 
-## Expanding the ESLint configuration
+- Local model install process
+- Generated story narrative
+- Auto-saving and continue menu
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech stack
+
+- Vite build tool
+- ReactJS front-end
+- Web worker running @huggingface/transformers
+- onnx-community/Llama-3.2-1B-Instruct-ONNX model
+
+## Installing locally
+
+```bash
+git clone git@github.com:saricden/pathcraft.git # Clone the repository to your machine
+cd pathcraft # Open the new directory
+npm install # Install npm dependencies
+npm run dev # Boot up the local dev server
+```
